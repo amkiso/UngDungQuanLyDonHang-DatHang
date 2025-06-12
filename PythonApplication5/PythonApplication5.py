@@ -12,6 +12,8 @@ NGÀY HOÀN THÀNH: 27/05/2025
 
 from ast import Lambda
 from enum import global_enum
+from math import e
+from operator import le
 import tkinter as tk
 import base64
 import re
@@ -26,6 +28,15 @@ from turtle import reset
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
+import random
+import smtplib
+import smtplib
+from datetime import datetime, timedelta
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
 __version__ = "1.0.1"
 
 def resource_path(relative_path):
@@ -176,8 +187,9 @@ def delete_selected_order():
 #thống kê
 def ThongKe():
     if current_file is None:
-        messagebox.showwarning("Thông báo", "Chưa có dữ liệu để thống kê.")
+        messagebox.showwarning("Thông báo", "Chưa có dữ liệu để thống kê.") #kiểm tra tên/đường dẫn file json hiện tại
         return
+    #Khai báo các biến giá trị để thực hiện tính toán
     QT, VN = 0, 0
     tong_khoi_luong = 0.0
     khoi_luong_kho = 0.0
@@ -194,9 +206,9 @@ def ThongKe():
 
     sp_stats = {"DT": 0, "GD": 0, "TT": 0, "TR": 0, "LT": 0}
 
-    orders = order_manager.FileRead()
-    tong_don = len(orders)
-
+    orders = order_manager.FileRead() # Đọc tất cả đơn hàng từ file
+    tong_don = len(orders) #tính tổng số đơn hàng
+    #Các tính toán chi tiết
     for order in orders:
         ma_don = order.Ma
         loai_don = ma_don[:2]
@@ -256,7 +268,7 @@ def ThongKe():
 
     ti_le_loi_nhuan = loi_nhuan / doanh_thu * 100 if doanh_thu else 0
 
-# Danh sách thống kê đầy đủ
+# Danh sách dữ liệu thống kê đầy đủ
     thong_ke = [
     ("Tổng số đơn hàng", tong_don, "100%"),
     ("Đơn nội địa (VN)", VN, f"{ti_le_VN:.1f}%"),
@@ -491,7 +503,7 @@ def Loc_San_Pham(parent_window, tree, order_manager):
 #cửa sổ thêm mới đơn hàng
 def open_add_order_window(parent_window, tree, order_manager):
     if current_file == None:
-        messagebox.showwarning("Thông báo", "Bạn chưa có file để thêm đơn hàng.")
+        messagebox.showwarning("Thông báo", "Bạn chưa có file để thêm đơn hàng.") #kiểm tra tên/đường dẫn file json hiện tại 
         return
     add_window = tk.Toplevel(parent_window)
     add_window.title("Thêm mới đơn hàng")
@@ -1406,8 +1418,11 @@ def open_user_detail(tree):
     if not selected:
         messagebox.showwarning("Thông báo", "Vui lòng chọn người dùng!")
         return
-
     username = tree.item(selected[0])["values"][0]
+    if current_username != "admin" and username == "admin":
+        messagebox.showerror("Truy cập bị từ chối", "Bạn không có quyền xem dữ liệu của tài khoản quản trị viên.")
+        return
+    
 
     # Tìm user
     users = load_users()["users"]
@@ -1473,16 +1488,38 @@ def open_user_detail(tree):
             messagebox.showinfo("Thành công", f"Đã thêm file cho {username}")
 
     def delete_user_file():
-        selected = file_tree.selection()
-        if not selected:
-            return
-        file_path = file_tree.item(selected[0])["values"][2]
-        if messagebox.askyesno("Xác nhận", f"Xóa file {file_path} khỏi danh sách người dùng {username}?"):
-            if file_path in user["data"]:
-                user["data"].remove(file_path)
-                save_user({"users": users})
-                load_user_files()
+     selected = file_tree.selection()
+     if not selected:
+         messagebox.showwarning("Cảnh báo", "Vui lòng chọn file để xóa!")
+         return
 
+     file_path = file_tree.item(selected[0])["values"][2]
+     filename = os.path.basename(file_path)
+
+     if not os.path.exists(file_path):
+         messagebox.showerror("Lỗi", "File không tồn tại.")
+         return
+
+     if messagebox.askyesno("Xác nhận", f"Xóa file {filename} khỏi danh sách người dùng {username}?"):
+         try:
+             # Nếu là file tổng, chỉ làm rỗng nội dung thay vì xóa khỏi danh sách
+             if filename == f"{username}_all_DH.json":
+                 with open(file_path, "w", encoding="utf-8") as f:
+                     json.dump([], f, indent=4, ensure_ascii=False)
+                 messagebox.showinfo("Thông báo", f"Đã làm rỗng file {filename} (tổng hợp).")
+             else:
+                 if file_path in user.get("data", []):
+                     user["data"].remove(file_path)
+                     messagebox.showinfo("Thông báo", f"Đã xóa file {filename} khỏi danh sách.")
+                      
+            # Ghi lại thay đổi
+             with open("User.json", "w", encoding="utf-8") as f:
+                 json.dump({"users": users}, f, indent=4, ensure_ascii=False)
+
+             load_user_files()
+
+         except Exception as e:
+             messagebox.showerror("Lỗi", f"Không thể xóa file: {e}")
     def load_selected_file():
         global current_file
         selected = file_tree.selection()
@@ -1497,13 +1534,38 @@ def open_user_detail(tree):
         messagebox.showinfo("Thông báo", f"Đã tải file {os.path.basename(file_path)}")
 
     def load_all_user_files():
-        count = 0
-        for file in user.get("data", []):
-            try:
-                count += len(QuanLyDonHang(file).FileRead())
-            except:
-                continue
-        messagebox.showinfo("Tổng đơn hàng", f"{username} có {count} đơn hàng trong tất cả file.")
+     all_orders = []
+
+     for file in user.get("data", []):
+         try:
+             orders = QuanLyDonHang(file).FileRead()
+             all_orders.extend(orders)
+         except Exception as e:
+             continue
+
+     if not all_orders:
+         messagebox.showinfo("Thông báo", f"Không có đơn hàng nào trong dữ liệu của {username}.")
+         return
+
+    # Tạo đường dẫn file đích
+     all_file = f"{username}_orders.json"
+
+    # Ghi tất cả đơn hàng vào file
+     try:
+         with open(all_file, "w", encoding="utf-8") as f:
+             json.dump([order.to_dict() for order in all_orders], f, indent=4, ensure_ascii=False)
+     except Exception as e:
+         messagebox.showerror("Lỗi", f"Không thể lưu file tổng: {e}")
+         return
+
+    # Tải vào TreeView chính
+     global current_file, order_manager
+     current_file = all_file
+     order_manager = QuanLyDonHang(current_file)
+     load_orders()
+     messagebox.showinfo("Thành công", f"Đã tổng hợp và tải {len(all_orders)} đơn hàng từ tất cả file của {username}.")
+     QL.destroy()
+
 
     btn_frame = tk.Frame(QL)
     btn_frame.pack(pady=10)
@@ -1548,7 +1610,6 @@ def delete_user(tree):
     AD.destroy()
 def Lammoi_user(tree):
     tree.delete(*tree.get_children())  # Xóa toàn bộ dòng hiện tại
-
     users = load_users()
     for user in users.get("users", []):
         tree.insert("", "end", values=(
@@ -1602,6 +1663,7 @@ def show_user_info(user_data, save_callback=None):
     tk.Label(file_frame, text=f"{file_count}", bg="#e0f7fa").pack(side="left")
 
     def show_file_detail():
+
         files = user_data.get("data", [])
         messagebox.showinfo("Chi tiết file", "\n".join(files) if files else "Không có file nào.")
 
@@ -2017,7 +2079,7 @@ def new_user_file(tree):
         # Bước 3: Làm mới lại giao diện TreeView
             load_user_files(tree)
 
-            messagebox.showinfo("Thành công", f"Đã tạo file mới: {os.path.basename(filepath)}")
+            messagebox.showinfo("Thành công", f"Đã tạo file mới: {os.path.basename(filename)}")
             window.destroy()
         except Exception as e:
             messagebox.showerror("Lỗi", f"Không thể tạo file: {e}")
@@ -2035,8 +2097,28 @@ def new_user_file(tree):
     create_button = tk.Button(window, text="Tạo file", command=create_file)
     create_button.pack(pady=10)
 
-# Gọi hàm này từ main window như sau:
-# create_json_file_window()
+def Send_OTP(receiver_email,user):
+    global otp_code, otp_expiry
+    otp_code = str(random.randint(100000, 999999))
+    otp_expiry = datetime.now() + timedelta(minutes=5)
+
+    subject = "Mã xác thực OTP"
+    body = f"Xin chào {user} !\nMã xác thực của bạn là: {otp_code}\nMã này sẽ hết hạn lúc {otp_expiry.strftime('%H:%M:%S')}."
+
+    msg = MIMEMultipart()
+    msg["From"] = formataddr(("Hệ Thống Giao Hàng", "thangcuoi1984a@gmail.com"))
+    msg["To"] = receiver_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login("thangcuoi1984a@gmail.com", "taoy fbrf cpuo rswr")
+            server.sendmail(msg["From"], msg["To"], msg.as_string())
+        return True
+    except Exception as e:
+        messagebox.showerror("Lỗi gửi email", str(e))
+        return False
 
 #Giao diện chính
 def MainProgram():
@@ -2290,6 +2372,7 @@ def open_register_window():
     new_user = {
         "username": username,
         "password": hash_password(password),
+        "email": email,
         "role": "user",
         "created_at": datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
         "status": "active",
@@ -2343,7 +2426,9 @@ def login(event=None):
     username = entry_username.get()
     password = entry_password.get()
     users = load_users()
-
+    if not username or not password:
+        messagebox.showwarning("Thiếu thông tin", "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu!")
+        return
     for user in users.get("users", []):
         
         if user["username"] == username and verify_password(password, user["password"]):
@@ -2425,8 +2510,106 @@ def update_order_in_user_file(edited_order_dict):
         messagebox.showwarning("Không tìm thấy", "Không tìm thấy đơn hàng để cập nhật.")
     except Exception as e:
         messagebox.showerror("Lỗi", f"Không thể cập nhật đơn hàng!\n{e}")
+
+def DoimatKhau(username):
+    def doi_mk():
+        mk = entry_pass.get()
+        mk2 = entry_pass2.get()
+        if mk != mk2:
+            messagebox.showerror("Lỗi", "Mật khẩu nhập lại không khớp!")
+            return
+        if len(mk) < 6:
+            messagebox.showwarning("Yêu cầu", "Mật khẩu phải có ít nhất 6 ký tự.")
+            return
+        users = load_users()
+        for u in users["users"]:
+            if u["username"] == username:
+                u["password"] = hash_password(mk)
+                break
+        with open("User.json", "w", encoding="utf-8") as f:
+            json.dump(users, f, indent=4, ensure_ascii=False)
+        messagebox.showinfo("Thành công", "Mật khẩu đã được đổi!")
+        win.destroy()
+
+    win = tk.Toplevel()
+    win.title("Đổi mật khẩu")
+    win.geometry("300x200")
+
+    tk.Label(win, text="Mật khẩu mới").pack(pady=5)
+    entry_pass = tk.Entry(win, show="*")
+    entry_pass.pack()
+
+    tk.Label(win, text="Nhập lại mật khẩu").pack(pady=5)
+    entry_pass2 = tk.Entry(win, show="*")
+    entry_pass2.pack()
+
+    tk.Button(win, text="Đổi mật khẩu", command=doi_mk).pack(pady=15)
 def QuenMatKhau():
-    messagebox.showinfo("Thông báo", "Vui lòng liên hệ với quản trị viên để lấy lại mật khẩu")
+    
+    username_khoiphuc =None
+    def gui_ma():
+     nonlocal username_khoiphuc
+     ten = entry_user.get().strip()
+     email = entry_email.get().strip()
+     users = load_users()["users"]
+     user = next((u for u in users if u["username"] == ten and u["email"] == email), None)
+     if not user:
+         messagebox.showerror("Lỗi", "Tên tài khoản hoặc email không đúng.")
+         return
+     username_khoiphuc = ten
+     if Send_OTP(email, ten):
+         messagebox.showinfo("Thành công", "Mã xác thực đã gửi đến email!")
+         btn_verify.config(state="normal")
+         # Vô hiệu hóa nút gửi mã + đếm ngược
+         dem_nguoc(60)
+
+    def dem_nguoc(giay):
+     if giay > 0:
+         btn_send.config(text=f"Gửi lại ({giay}s)", state="disabled")
+         win.after(1000, dem_nguoc, giay - 1)
+     else:
+         btn_send.config(text="Gửi mã", state="normal")
+
+
+    def xac_thuc():
+        nhap_ma = entry_otp.get().strip()
+        if datetime.now() > otp_expiry:
+            messagebox.showerror("Hết hạn", "Mã xác thực đã hết hạn.")
+        elif nhap_ma == otp_code:
+            messagebox.showinfo("Thông báo","Xác thực thành công!")
+            win.destroy()
+            DoimatKhau(username_khoiphuc)
+            
+            
+        else:
+            messagebox.showerror("Sai mã", "Mã không đúng!")
+   
+    win = tk.Toplevel()
+    win.title("Quên mật khẩu")
+    win.geometry("500x250")
+    level1 = tk.Frame(win)
+    level1.pack(pady=10,padx=5)
+    level2 = tk.Frame(win)
+    level2.pack(pady=10,padx=5)
+    tk.Label(level1, text="Tên tài khoản").grid(row=0, column=0,padx=10, pady=5)
+    entry_user = tk.Entry(level1)
+    entry_user.grid(row=0, column=1,padx=10, pady=5)
+
+    tk.Label(level1, text="Email đã đăng ký").grid(row=1, column=0,padx=10, pady=5)
+    entry_email = tk.Entry(level1)
+    entry_email.grid(row=1, column=1,padx=10, pady=5)
+
+    btn_send = tk.Button(level1, text="Gửi mã", command=gui_ma)
+    btn_send.grid(row=1, column=2, padx=10, pady=5)
+
+
+    tk.Label(level1, text="Nhập mã xác thực").grid(row=2, column=0,padx=10, pady=5)
+    entry_otp = tk.Entry(level1)
+    entry_otp.grid(row=2, column=1,padx=10, pady=5)
+
+    btn_verify = tk.Button(level2, text="Xác thực mã", command=xac_thuc, state="disabled")
+    btn_verify.grid(row=3, column=1,padx=10, pady=5)
+    btn_close = tk.Button(level2, text="Đóng", command= lambda:win.destroy()).grid(row=3, column=2,padx=10, pady=5)
 def Login():
     global roo, entry_username, entry_password
     

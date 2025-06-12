@@ -7,9 +7,7 @@
             "role": "admin",
             "created_at": "14/04/2025 08:59:54",
             "status": "active",
-            "data": [
-                "all_orders.json"
-            ]
+            "data": []
         },
         {
             "username": "tear",
@@ -19,8 +17,6 @@
             "status": "active",
             "role": "user",
             "data": [
-                "D:/HOANGVU/CODE/Python/PythonApplication3/PythonApplication3/DonHang_sapxep.json",
-                "D:/HOANGVU/CODE/Python/PythonApplication3/PythonApplication3/DonHang.JSON",
                 "D:/HOANGVU/CODE/Python/temp/five.json",
                 "tear_all_DH.json",
                 "tear_orders.json"
@@ -42,6 +38,33 @@
             "status": "active",
             "data": [
                 "HUIT_orders.json"
+            ]
+        },
+        {
+            "username": "ChauPhat",
+            "password": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+            "role": "user",
+            "created_at": "12/06/2025 21:22:55",
+            "status": "active",
+            "data": []
+        },
+        {
+            "username": "KimNgu",
+            "password": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+            "role": "user",
+            "created_at": "12/06/2025 21:23:45",
+            "status": "active",
+            "data": []
+        },
+        {
+            "username": "dsa",
+            "password": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+            "role": "user",
+            "created_at": "12/06/2025 21:25:08",
+            "email": "Bao295770@gmail.com",
+            "status": "active",
+            "data": [
+                "dsa_orders.json"
             ]
         }
     ]
